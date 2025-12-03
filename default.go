@@ -263,6 +263,18 @@ func messageDecoding() {
 			APPEND("error.message", "Processor {{{_ingest.on_failure_processor_type}}} with tag {{{_ingest.on_failure_processor_tag}}} in pipeline {{{_ingest.on_failure_pipeline}}} failed with message: {{{_ingest.on_failure_message}}}"),
 		)
 
+	REMOVE(
+		"metadata.host.aid",
+		"metadata.user.UserSid_readable",
+	).
+		TAG("remove metadata host aid and user sid").
+		IGNORE_MISSING(true)
+	RENAME("metadata", "crowdstrike.info").
+		IGNORE_MISSING(true).
+		ON_FAILURE(
+			APPEND("error.message", errorMessage),
+		)
+
 	CONVERT("_temp.utc_timestamp", "crowdstrike.UTCTimestamp", "long").
 		IGNORE_MISSING(true).
 		IGNORE_FAILURE(true)
