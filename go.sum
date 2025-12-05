@@ -6,6 +6,8 @@ github.com/efd6/dispear v0.0.0-20251110014810-dfeb192cf303 h1:D/HnBGWcVFlI1bl7s3
 github.com/efd6/dispear v0.0.0-20251110014810-dfeb192cf303/go.mod h1:1litGV4dftDrbEawVOUQSBEvBdr11YYay2FiKXQYQEk=
 github.com/efd6/dispear v0.0.0-20251117041753-eda222fe61f5 h1:sP/twFZ5YIFr1BM0UfCFjcPWBHF5d+Q4ecq6EvfJ5qo=
 github.com/efd6/dispear v0.0.0-20251117041753-eda222fe61f5/go.mod h1:1litGV4dftDrbEawVOUQSBEvBdr11YYay2FiKXQYQEk=
+github.com/efd6/dispear v0.0.0-20251204044559-54136ff77369 h1:u45wynsq6Xkm0YSpqlDLfD2s99Fa843jgxWxsykt8Hc=
+github.com/efd6/dispear v0.0.0-20251204044559-54136ff77369/go.mod h1:1litGV4dftDrbEawVOUQSBEvBdr11YYay2FiKXQYQEk=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
