@@ -242,10 +242,21 @@ func messageDecoding() {
 	BLANK().COMMENT("Message decoding.")
 
 	REMOVE(
+		"ecs.version",
+		"event.dataset",
+		"event.module",
+		"observer.type",
+		"observer.vendor",
+	).TAG(
+		"remove static constant keyword fields",
+	).IGNORE_MISSING(true)
+
+	REMOVE(
 		"organization",
 		"division",
 		"team",
 	).
+		TAG("remove agentless metadata").
 		IF("ctx.organization instanceof String && ctx.division instanceof String && ctx.team instanceof String").
 		DESCRIPTION("Removes the fields added by Agentless as metadata, as they can collide with ECS fields.").
 		IGNORE_MISSING(true)
@@ -1181,10 +1192,13 @@ func userFields() {
 	APPEND("user.roles", "admin").
 		IF(`ctx.crowdstrike?.UserIsAdmin == "1"`)
 	RENAME("crowdstrike.User.Name", "user.name").
-		IF(`ctx.crowdstrike?.User?.Name != null && ctx.user?.name == null`).
+		IF(`ctx.crowdstrike?.User instanceof Map && ctx.crowdstrike.User.Name != null && ctx.user?.name == null`).
 		IGNORE_MISSING(true)
 	RENAME("crowdstrike.UserName", "user.name").
 		IF(`ctx.crowdstrike?.UserName != null && ctx.user?.name == null`).
+		IGNORE_MISSING(true)
+	RENAME("crowdstrike.User", "user.name").
+		IF(`ctx.crowdstrike?.User instanceof String && ctx.user?.name == null`).
 		IGNORE_MISSING(true)
 	SPLIT("_temp.user_parts", "crowdstrike.UserPrincipal", "@").
 		IF(`ctx.crowdstrike?.UserPrincipal != null`)
@@ -1865,7 +1879,6 @@ func cleanup() {
 		IGNORE_MISSING(true).
 		IGNORE_FAILURE(true)
 	REMOVE(
-		"ecs.version",
 		"_temp",
 		"crowdstrike.timestamp",
 		"crowdstrike._time",
