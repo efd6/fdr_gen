@@ -574,6 +574,17 @@
     "kind": "alert",
     "outcome": "unknown"
   },
+  "FalconProcessHandleOpDetectInfo": {
+    "category": [
+      "malware",
+      "process"
+    ],
+    "type": [
+      "info",
+      "access"
+    ],
+    "kind": "alert"
+  },
   "FalconServiceStatus": {
     "category": [
       "package"
@@ -672,6 +683,16 @@
     ],
     "type": [
       "change"
+    ],
+    "kind": "event",
+    "outcome": "success"
+  },
+  "FileWrittenWithEntropyHigh": {
+    "category": [
+      "file"
+    ],
+    "type": [
+      "creation"
     ],
     "kind": "event",
     "outcome": "success"
@@ -971,6 +992,15 @@
     "kind": "event",
     "outcome": "success"
   },
+  "InstalledBrowserExtension": {
+    "category": [
+      "package"
+    ],
+    "type": [
+      "installation"
+    ],
+    "kind": "event"
+  },
   "InstalledUpdates": {
     "category": [
       "host",
@@ -1052,6 +1082,15 @@
     ],
     "kind": "event",
     "outcome": "success"
+  },
+  "KernelServiceStarted": {
+    "category": [
+      "process"
+    ],
+    "type": [
+      "start"
+    ],
+    "kind": "event"
   },
   "KextLoad": {
     "category": [
@@ -1232,6 +1271,16 @@
     ],
     "kind": "event",
     "outcome": "unknown"
+  },
+  "MountedVolume": {
+    "category": [
+      "file"
+    ],
+    "type": [
+      "info"
+    ],
+    "kind": "event",
+    "outcome": "success"
   },
   "NeighborListIP4": {
     "category": [
@@ -1709,6 +1758,15 @@
     "kind": "alert",
     "outcome": "success"
   },
+  "ReflectiveDotnetModuleLoad": {
+    "category": [
+      "library"
+    ],
+    "type": [
+      "start"
+    ],
+    "kind": "event"
+  },
   "RegCrowdstrikeKeyUpdate": {
     "category": [
       "registry"
@@ -1932,6 +1990,15 @@
     "kind": "event",
     "outcome": "success"
   },
+  "SensorAntiTamperState": {
+    "category": [
+      "configuration"
+    ],
+    "type": [
+      "info"
+    ],
+    "kind": "state"
+  },
   "SensorHeartbeat": {
     "category": [
       "package"
@@ -1942,12 +2009,40 @@
     "kind": "event",
     "outcome": "success"
   },
+  "SensorSettingsUpdate": {
+    "category": [
+      "configuration"
+    ],
+    "type": [
+      "change"
+    ],
+    "kind": "event"
+  },
+  "ServicesStatusInfo": {
+    "category": [
+      "configuration"
+    ],
+    "type": [
+      "info"
+    ],
+    "kind": "state"
+  },
   "ServiceStarted": {
     "category": [
       "process"
     ],
     "type": [
       "start"
+    ],
+    "kind": "event",
+    "outcome": "success"
+  },
+  "ServiceStopped": {
+    "category": [
+      "process"
+    ],
+    "type": [
+      "end"
     ],
     "kind": "event",
     "outcome": "success"
@@ -2122,6 +2217,15 @@
     ],
     "kind": "alert",
     "outcome": "success"
+  },
+  "SuspiciousPrivilegedProcessHandle": {
+    "category": [
+      "process"
+    ],
+    "type": [
+      "info"
+    ],
+    "kind": "event"
   },
   "SuspiciousRegAsepUpdate": {
     "category": [

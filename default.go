@@ -103,6 +103,8 @@ func main() {
 		IGNORE_EMPTY(true)
 	RENAME("crowdstrike.event_simpleName", "event.action").
 		IGNORE_MISSING(true)
+	RENAME("crowdstrike.SuspiciousHandleOpenReason", "event.reason").
+		IGNORE_MISSING(true)
 
 	BLANK()
 	BLANK().COMMENT("Prepare data.")
@@ -229,6 +231,14 @@ func main() {
 
 	BLANK()
 
+	threatFields()
+
+	BLANK()
+
+	packageFields()
+
+	BLANK()
+
 	crowdstrikeFields()
 
 	BLANK()
@@ -317,6 +327,8 @@ func messageDecoding() {
 		field string
 		cond  string
 	}{
+		{field: "BatchTimestamp"},
+		{field: "BrowserExtensionInstalledTimestamp"},
 		{field: "ContextTimeStamp", cond: `ctx.crowdstrike?.ContextTimeStamp != null && ctx.crowdstrike?.ContextTimeStamp != ""`},
 		{field: "StartTime"},
 		{field: "EndTime"},
@@ -1712,8 +1724,82 @@ func deviceFields() {
 	}
 }
 
+func threatFields() {
+	BLANK().COMMENT("Threat Fields.")
+
+	for _, field := range []struct {
+		child string
+		dst   string
+	}{
+		{child: "Technique", dst: "threat.technique.name"},
+		{child: "Tactic", dst: "threat.tactic.name"},
+	} {
+		FOREACH("crowdstrike.Attacks",
+			APPEND(field.dst, fmt.Sprintf(`{{{_ingest._value.%s}}}`, field.child)).
+				ALLOW_DUPLICATES(false),
+		).
+			TAG(fmt.Sprintf("foreach_of_crowdstrike_Attacks_with_%s", field.child)). // Avoid hash collision warning.
+			IF(`ctx.crowdstrike?.Attacks instanceof List`)
+	}
+}
+
+func packageFields() {
+	BLANK().COMMENT("Package fields.")
+
+	SCRIPT().
+		TAG("set_browser_extension_architecture_value").
+		IF(`ctx.crowdstrike?.BrowserExtensionArchitecture != null`).
+		PARAMS(map[string]any{
+			"0": "UNKNOWN",
+			"1": "MANIFEST_V2",
+			"2": "MANIFEST_V3",
+			"3": "SAFARI_APP",
+		}).
+		SOURCE(`
+		  ctx.package = ctx.package ?: [:];
+		  ctx.package.architecture = params[ctx.crowdstrike.BrowserExtensionArchitecture];
+		`)
+
+	for _, change := range []struct {
+		from string
+		to   string
+	}{
+		{from: "crowdstrike.BrowserExtensionInstalledTimestamp", to: "package.installed"},
+		{from: "crowdstrike.BrowserExtensionName", to: "package.name"},
+		{from: "crowdstrike.BrowserExtensionPath", to: "package.path"},
+		{from: "crowdstrike.BrowserExtensionVersion", to: "package.version"},
+	} {
+		RENAME(change.from, change.to).
+			IGNORE_MISSING(true)
+	}
+}
+
 func crowdstrikeFields() {
 	BLANK().COMMENT("Crowdstrike fields.")
+
+	for _, src := range []string{
+		"crowdstrike.ContextProcessTagsAsString",
+		"crowdstrike.PatternIdList",
+		"crowdstrike.ParentProcessPatternIdList",
+		"crowdstrike.GrandparentProcessPatternIdList",
+	} {
+		SPLIT("", src, ",").
+			IGNORE_MISSING(true)
+	}
+	SCRIPT().
+		TAG("set_browser_extension_install_method_value").
+		IF(`ctx.crowdstrike?.BrowserExtensionInstallMethod != null`).
+		PARAMS(map[string]any{
+			"0": "UNIDENTIFIED",
+			"1": "BROWSER",
+			"2": "WEBSTORE",
+			"3": "GPO",
+			"4": "SIDELOADED",
+			"5": "WEBSTORE_3RD_PARTY",
+		}).
+		SOURCE(`
+		  ctx.crowdstrike.BrowserExtensionInstallMethod = params[ctx.crowdstrike.BrowserExtensionInstallMethod];
+		`)
 
 	JSON("", "crowdstrike.ResourceAttributes").
 		IF(`ctx.crowdstrike?.ResourceAttributes instanceof String`).
@@ -1889,6 +1975,7 @@ func cleanup() {
 		"crowdstrike.UserIsAdmin",
 		"crowdstrike.UTCTimestamp",
 		"crowdstrike.TargetDirectoryName",
+		"crowdstrike.BrowserExtensionArchitecture",
 		"_conf",
 	).IGNORE_MISSING(true)
 	SCRIPT().
