@@ -1920,6 +1920,17 @@ func cleanup() {
 
 	BLANK()
 
+	BLANK().COMMENT("error handling")
+
+	SET("event.kind").
+		TAG("set pipeline error into event.kind").
+		IF(`ctx.error?.message != null`).
+		VALUE("pipeline_error")
+	APPEND("event.kind", "preserve_original_event").
+		TAG("append preserve_original_event into event.kind").
+		IF(`ctx.error?.message != null`).
+		ALLOW_DUPLICATES(false)
+
 	ON_FAILURE(
 		SET("event.kind").VALUE("pipeline_error"),
 		APPEND("tags", "preserve_original_event").ALLOW_DUPLICATES(false),
