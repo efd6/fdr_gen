@@ -28,7 +28,7 @@ func main() {
 
 	SCRIPT().
 		DESCRIPTION("Categorize events.").
-		TAG("categorize events").
+		TAG("categorize_events").
 		PARAMS(cats).
 		SOURCE(`
           def m = params.get(ctx.crowdstrike?.event_simpleName);

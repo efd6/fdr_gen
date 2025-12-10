@@ -92,15 +92,20 @@ func main() {
 	}
 
 	BLANK()
+	cspmFields()
+
+	BLANK()
 	BLANK().COMMENT("Event fields.")
 	SET("event.id").
 		DESCRIPTION("Concat the fields used in fingerprint.").
 		IF(`ctx.crowdstrike?.id != null || ctx.crowdstrike?.aid != null || ctx.crowdstrike?.cid != null`).
-		VALUE(`{{{#crowdstrike.id}}}{{{ crowdstrike.id }}}{{{/crowdstrike.id}}}|{{{#crowdstrike.aid}}}{{{ crowdstrike.aid }}}{{{/crowdstrike.aid}}}|{{{#crowdstrike.cid}}}{{{ crowdstrike.cid }}}{{{/crowdstrike.cid}}}`)
+		VALUE(`{{{#crowdstrike.id}}}{{{ crowdstrike.id }}}{{{/crowdstrike.id}}}|{{{#crowdstrike.aid}}}{{{ crowdstrike.aid }}}{{{/crowdstrike.aid}}}|{{{#crowdstrike.cid}}}{{{ crowdstrike.cid }}}{{{/crowdstrike.cid}}}`).
+		OVERRIDE(false)
 	SET("message").
 		TAG("construct_message_from_event_simpleName").
 		COPY_FROM("crowdstrike.event_simpleName").
-		IGNORE_EMPTY(true)
+		IGNORE_EMPTY(true).
+		OVERRIDE(false)
 	RENAME("crowdstrike.event_simpleName", "event.action").
 		IGNORE_MISSING(true)
 	RENAME("crowdstrike.SuspiciousHandleOpenReason", "event.reason").
@@ -109,7 +114,7 @@ func main() {
 	BLANK()
 	BLANK().COMMENT("Prepare data.")
 	SCRIPT().
-		TAG("convert count fields to long").
+		TAG("convert_count_fields_to_long").
 		DESCRIPTION("Convert all count fields to number.").
 		SOURCE(`
           for (entry in ctx.crowdstrike.entrySet()) {
@@ -123,7 +128,7 @@ func main() {
           }
 		`)
 	SCRIPT().
-		TAG("remove empty hashes").
+		TAG("remove_empty_hashes").
 		DESCRIPTION("Remove all 0's hashes.").
 		PARAMS(map[string]any{
 			"MD5HashData":    "md5",
@@ -258,7 +263,7 @@ func messageDecoding() {
 		"observer.type",
 		"observer.vendor",
 	).TAG(
-		"remove static constant keyword fields",
+		"remove_static_constant_keyword_fields",
 	).IGNORE_MISSING(true)
 
 	REMOVE(
@@ -266,7 +271,7 @@ func messageDecoding() {
 		"division",
 		"team",
 	).
-		TAG("remove agentless metadata").
+		TAG("remove_agentless_metadata").
 		IF("ctx.organization instanceof String && ctx.division instanceof String && ctx.team instanceof String").
 		DESCRIPTION("Removes the fields added by Agentless as metadata, as they can collide with ECS fields.").
 		IGNORE_MISSING(true)
@@ -288,7 +293,7 @@ func messageDecoding() {
 		"metadata.host.aid",
 		"metadata.user.UserSid_readable",
 	).
-		TAG("remove metadata host aid and user sid").
+		TAG("remove_metadata_host_aid_and_user_sid").
 		IGNORE_MISSING(true)
 	RENAME("metadata", "crowdstrike.info").
 		IGNORE_MISSING(true).
@@ -335,7 +340,7 @@ func messageDecoding() {
 	} {
 		s := SCRIPT().
 			DESCRIPTION(fmt.Sprintf("Conditionally convert %s from Windows NT timestamp format to UNIX", src.field)).
-			TAG(fmt.Sprintf("script date %s from nt", src.field)).
+			TAG(fmt.Sprintf("script_date_%s_from_nt", src.field)).
 			SOURCE(ntTimeToUnix(fmt.Sprintf("ctx.crowdstrike?.%s", src.field)))
 		if src.cond != "" {
 			s.IF(src.cond)
@@ -420,7 +425,7 @@ Leave crowdstrike values in place, since they have their own semantics.`)
 		)
 	SCRIPT().
 		DESCRIPTION("Script to set event.severity.").
-		TAG("script set crowdstrike alert severity").
+		TAG("script_set_crowdstrike_alert_severity").
 		IF("ctx.crowdstrike?.alert?.severity instanceof long && ctx.crowdstrike.alert.severityName == null").
 		SOURCE(`
           long severity = ctx.crowdstrike.alert.severity;
@@ -441,7 +446,7 @@ Leave crowdstrike values in place, since they have their own semantics.`)
 		)
 	SCRIPT().
 		IF("ctx.crowdstrike?.SeverityName instanceof String").
-		TAG("script set event severity").
+		TAG("script_set_event_severity").
 		SOURCE(`
           ctx.event = ctx.event ?: [:];
           String name = ctx.crowdstrike.SeverityName;
@@ -499,11 +504,44 @@ func eppDetectionSummaryFields() {
 	}
 }
 
+func cspmFields() {
+	BLANK().COMMENT("CSPM fields")
+
+	BLANK().COMMENT("Can be both string and int, fields are mapped as keyword.")
+	for _, src := range []string{
+		"crowdstrike.service",
+		"crowdstrike.cloudplatform",
+	} {
+		CONVERT("", src, "string").
+			IGNORE_MISSING(true)
+	}
+
+	BLANK()
+
+	RENAME("crowdstrike.resource", "crowdstrike.resource_name").
+		DESCRIPTION("Rename crowdstrike.resource in case concrete value field is mapped as object.").
+		IF(`ctx.crowdstrike?.resource instanceof String`)
+
+	REMOVE("cloud").
+		IGNORE_MISSING(true)
+
+	BLANK()
+
+	PIPELINE("cspm_iom").
+		IF(`` +
+			`(ctx.crowdstrike?.disposition != null && ctx.crowdstrike.disposition.equalsIgnoreCase('Failed')) ||` +
+			`(ctx.crowdstrike?.event_simpleName != null && ctx.crowdstrike.event_simpleName.equalsIgnoreCase('CloudSecurityIOMEvaluation'))`,
+		)
+
+	PIPELINE("cspm_ioa").
+		IF(`ctx.crowdstrike?.vertex_type != null && ctx.crowdstrike.vertex_type.equalsIgnoreCase('ioa')`)
+}
+
 func fingerPrinting() {
 	REMOVE("_id").COMMENT(`AWS S3 input does _id-Based Deduplication and generates "_id" by default.
 When "Data Deduplication" is not enabled, this field must be removed.
 https://www.elastic.co/docs/reference/beats/filebeat/filebeat-input-aws-s3#_document_id_generation`).
-		TAG("remove id based deduplication").
+		TAG("remove_id_based_deduplication").
 		DESCRIPTION("When data deduplication is disabled, even the _id-Based Deduplication needs to be removed.").
 		IF("ctx._conf?.enable_deduplication == false").
 		IGNORE_MISSING(true)
@@ -672,7 +710,7 @@ func processFields() {
 	RENAME("crowdstrike.CommandLine", "process.command_line").
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG("split command line").
+		TAG("split_command_line").
 		DESCRIPTION("Implements Windows-like SplitCommandLine").
 		IF(`ctx.process?.command_line != null && ctx.process.command_line != "" && ctx.host?.os?.type != null`).
 		SOURCE(`
@@ -759,7 +797,7 @@ func processFields() {
 		IF(`ctx._temp?.isLibrary != true && ctx._temp?.isDriver != true`).
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG("process name").
+		TAG("process_name").
 		DESCRIPTION("Calculate process.name").
 		IF(`ctx.process?.executable != null && ctx.process.executable != ""`).
 		SOURCE(`
@@ -781,7 +819,7 @@ when the "runc" process clones itself to get into its own namespace.
 The child process would have its executable path set to "/"
 and consequently, the process name would not be set.
 For more details, see https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3.`).
-		TAG("parse process name from command line").
+		TAG("parse_process_name_from_command_line").
 		DESCRIPTION("Extract process.name from command line if not already present.").
 		IF(`
           ctx.process?.executable == '/' &&
@@ -811,7 +849,7 @@ For more details, see https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/
 	}
 
 	SCRIPT().
-		TAG("process uptime").
+		TAG("process_uptime").
 		DESCRIPTION("Calculate process.uptime").
 		IF(`
           ctx.crowdstrike?.ProcessStartTime != null && ctx.crowdstrike?.ProcessStartTime != "" &&
@@ -828,7 +866,7 @@ For more details, see https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/
           }
 		`)
 	SCRIPT().
-		TAG("parse raw pids").
+		TAG("parse_raw_pids").
 		DESCRIPTION("Parse raw process id's so that they roll over if out of 32-bit range").
 		SOURCE(`
           def parsePid(String pid) {
@@ -856,7 +894,7 @@ For more details, see https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/
 		field := fmt.Sprintf("crowdstrike.Process%sTime", timestamp.name)
 		painField := fmt.Sprintf("ctx.crowdstrike?.Process%sTime", timestamp.name)
 		DATE(field, field, "UNIX").
-			TAG(fmt.Sprintf("date process %s time", id)).
+			TAG(fmt.Sprintf("date_process_%s_time", id)).
 			IF(notNullEmpytOrNone(painField))
 		RENAME(field, fmt.Sprintf("process.%s", id)).
 			IF(painField + ` != ""`).
@@ -928,7 +966,7 @@ For more details, see https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/
           ctx._temp?.hashes != null && ctx._temp?.hashes.size() > 0
 		`)
 	SCRIPT().
-		TAG("integrity level").
+		TAG("integrity_level").
 		IF(`ctx.crowdstrike?.IntegrityLevel != null`).
 		PARAMS(map[string]any{
 			"levels": map[string]any{
@@ -1007,7 +1045,7 @@ func libraryFields() {
 		IGNORE_MISSING(true).
 		IGNORE_FAILURE(true)
 	SCRIPT().
-		TAG(`script set dll name`).
+		TAG(`script_set_dll_name`).
 		IF(`
            (ctx._temp?.isLibrary == true || ctx._temp?.isDriver == true) &&
            ctx.crowdstrike?.ImageFileName != null &&
@@ -1028,7 +1066,7 @@ func libraryFields() {
 		`).
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG(`script set process name`).
+		TAG(`script_set_process_name`).
 		IF(`ctx._temp?.isLibrary == true && ctx.crowdstrike?.TargetImageFileName != null && ctx.host?.os?.type == 'windows'`).
 		SOURCE(`
           int idx = ctx.crowdstrike.TargetImageFileName.lastIndexOf('\\');
@@ -1042,7 +1080,7 @@ func libraryFields() {
 		IF(`ctx._temp?.isLibrary == true && ctx.host?.os?.type == 'windows'`).
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG(`script set process name`).
+		TAG(`script_set_process_name`).
 		IF(`
           ctx.event?.action == 'ClassifiedModuleLoad' &&
           ctx.crowdstrike?.ImageSignatureLevel != null &&
@@ -1096,7 +1134,7 @@ func registryFields() {
 		IGNORE_FAILURE(true)
 
 	SCRIPT().
-		TAG("script set event action and type").
+		TAG("script_set_event_action_and_type").
 		IF(`ctx.crowdstrike?.RegOperationType != null`).
 		PARAMS(map[string]any{
 			"op_types": map[string]any{
@@ -1315,12 +1353,12 @@ func networkFields() {
 		"inbound",
 	} {
 		SET("network.direction").
-			TAG(fmt.Sprintf("set network direction %s", dir)).
+			TAG(fmt.Sprintf("set_network_direction_%s", dir)).
 			IF(fmt.Sprintf(`ctx.crowdstrike?.ConnectionDirection == "%d"`, i)).
 			VALUE(dir)
 	}
 	SET("network.direction").
-		TAG("set network direction unknown").
+		TAG("set_network_direction_unknown").
 		IF(`ctx.network?.direction == null && ctx.crowdstrike?.ConnectionDirection != null && ctx.crowdstrike.ConnectionDirection != ""`).
 		VALUE("unknown")
 
@@ -1369,7 +1407,7 @@ than dropping the data on the floor.`,
 	RENAME("crowdstrike.Protocol", "network.iana_number").
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG("network transport lookup").
+		TAG("network_transport_lookup").
 		IF(`ctx.network?.iana_number != null`).
 		SOURCE(`
           def iana_number = ctx.network.iana_number;
@@ -1516,7 +1554,7 @@ func dnsFields() {
 		IF(`ctx.event?.action != null && ctx.dns?.question?.name == null && ctx.event.action.contains("DnsRequest")`).
 		IGNORE_MISSING(true)
 	SCRIPT().
-		TAG("dns request type to name").
+		TAG("dns_request_type_to_name").
 		DESCRIPTION("Map decimal DNS request type to its name.").
 		PARAMS(map[string]any{
 			"1":     "A",
@@ -1628,7 +1666,7 @@ func fileFields() {
 		IF(`ctx.file?.path != null && (ctx.event.action.contains("Directory") || ctx.file.path.endsWith("\\") || ctx.file.path.endsWith("/"))`).
 		VALUE("dir")
 	SCRIPT().
-		TAG("parse file path").
+		TAG("parse_file_path").
 		DESCRIPTION("Adds file information.").
 		IF(`ctx.file?.path != null && ctx.file.path.length() > 1`).
 		SOURCE(`
@@ -1662,7 +1700,7 @@ func fileFields() {
           }
 		`)
 	SCRIPT().
-		TAG("parse file ext original path").
+		TAG("parse_file_ext_original_path").
 		DESCRIPTION("Adds file.Ext.original.* information.").
 		IF(`ctx.file?.Ext?.original?.path != null && ctx.file.Ext.original.path.length() > 1`).
 		SOURCE(`
@@ -1715,7 +1753,7 @@ func deviceFields() {
 		"observer.serial_number",
 	} {
 		s := SET("device.id").
-			TAG(fmt.Sprintf("set device id from %s", src)).
+			TAG(fmt.Sprintf("set_device_id_from_%s", src)).
 			COPY_FROM(src).
 			IGNORE_EMPTY(true)
 		if i != 0 {
@@ -1801,12 +1839,6 @@ func crowdstrikeFields() {
 		  ctx.crowdstrike.BrowserExtensionInstallMethod = params[ctx.crowdstrike.BrowserExtensionInstallMethod];
 		`)
 
-	JSON("", "crowdstrike.ResourceAttributes").
-		IF(`ctx.crowdstrike?.ResourceAttributes instanceof String`).
-		ON_FAILURE(
-			REMOVE("crowdstrike.ResourceAttributes").
-				IGNORE_MISSING(true),
-		)
 	for _, src := range []string{
 		"crowdstrike.FalconGroupingTags",
 		"crowdstrike.SensorGroupingTags",
@@ -1816,7 +1848,7 @@ func crowdstrikeFields() {
 			IGNORE_FAILURE(true)
 	}
 	SCRIPT().
-		TAG("convert Tags").
+		TAG("convert_tags").
 		DESCRIPTION("Convert tags for indexing as keyword.").
 		IF(`ctx.crowdstrike?.Tags != null`).
 		SOURCE(`
@@ -1928,7 +1960,7 @@ func crowdstrikeFields() {
 	}
 	SCRIPT().
 		DESCRIPTION("Remove long fields based on user input stored in _conf.long_fields*.").
-		TAG("script remove long fields").
+		TAG("script_remove_long_fields").
 		IF("ctx._conf?.long_fields == 'delete_long_fields' && ctx._conf?.long_fields_max_length != null").
 		PARAMS(map[string]any{
 			"potential_long_fields": longFields,
@@ -1979,7 +2011,7 @@ func cleanup() {
 		"_conf",
 	).IGNORE_MISSING(true)
 	SCRIPT().
-		TAG("remove nulls").
+		TAG("remove_nulls").
 		DESCRIPTION("This script processor iterates over the whole document to remove fields with null values.").
 		SOURCE(`
           void handleMap(Map map) {
@@ -2010,11 +2042,11 @@ func cleanup() {
 	BLANK().COMMENT("error handling")
 
 	SET("event.kind").
-		TAG("set pipeline error into event.kind").
+		TAG("set_pipeline_error_into_event_kind").
 		IF(`ctx.error?.message != null`).
 		VALUE("pipeline_error")
 	APPEND("event.kind", "preserve_original_event").
-		TAG("append preserve_original_event into event.kind").
+		TAG("append_preserve_original_event_into_event_kind").
 		IF(`ctx.error?.message != null`).
 		ALLOW_DUPLICATES(false)
 

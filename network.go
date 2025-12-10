@@ -31,7 +31,7 @@ func main() {
 		"LocalIP",
 	} {
 		SET(fmt.Sprintf("%s.ip", local)).
-			TAG(strings.ToLower(fmt.Sprintf("%[1]s.ip from %[2]s", local, src))).
+			TAG(strings.ToLower(fmt.Sprintf("%[1]s_ip_from_%[2]s", local, src))).
 			IF(fmt.Sprintf(`ctx.%[1]s?.ip == null && ctx.crowdstrike?.%[2]s != null`, local, src)).
 			VALUE(fmt.Sprintf(`{{{crowdstrike.%s}}}`, src))
 	}
@@ -40,7 +40,7 @@ func main() {
 		"LocalAddressIP6",
 	} {
 		SET(fmt.Sprintf("%s.ip", local)).
-			TAG(strings.ToLower(fmt.Sprintf("%[1]s.ip from %[2]s", local, src))).
+			TAG(strings.ToLower(fmt.Sprintf("%[1]s_ip_from_%[2]s", local, src))).
 			IF(fmt.Sprintf(`ctx.%[1]s?.ip == null && ctx.crowdstrike?.%[2]s instanceof List && ctx.crowdstrike.%[2]s.length > 0`, local, src)).
 			VALUE(fmt.Sprintf(`{{{crowdstrike.%s.0}}}`, src))
 	}
